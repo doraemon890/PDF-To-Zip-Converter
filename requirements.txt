@@ -1,3 +1,4 @@
 telethon
 cryptg
 asyncio
+git+https://github.com/doraemon890/pyrogram
