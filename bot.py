@@ -13,35 +13,32 @@ logging.basicConfig(
 LOGGER = logging.getLogger(__name__)
 
 # Initialize the Telegram client
-api_id = int(os.environ.get("APP_ID"))
-api_hash = os.environ.get("API_HASH")
-bot_token = os.environ.get("TOKEN")
+api_id = int(os.getenv("APP_ID"))
+api_hash = os.getenv("API_HASH")
+bot_token = os.getenv("TOKEN")
 Jarvis = TelegramClient('client', api_id, api_hash).start(bot_token=bot_token)
 
 # Dictionary to keep track of user files
 user_files = {}
 
-# Function to zip files
-def zip_files(files, zip_file_path):
+def zip_files(files: list[str], zip_file_path: str) -> bool:
     try:
         with zipfile.ZipFile(zip_file_path, 'w') as zip_file:
             for file in files:
                 zip_file.write(file, os.path.basename(file))
+        return True
     except Exception as e:
         LOGGER.error(f"Error creating zip file: {e}")
         return False
-    return True
 
-# Command to start collecting PDFs
 @Jarvis.on(events.NewMessage(pattern="^/zip$"))
-async def start_zip_command(event):
+async def start_zip_command(event: events.NewMessage.Event):
     user_id = event.sender_id
     user_files[user_id] = []
     await event.reply("Please send all ᴘᴅғ files one by one. When done, use /confirm to zip them.")
 
-# Collect PDF files sent by the user
 @Jarvis.on(events.NewMessage(func=lambda e: e.is_private and e.document))
-async def collect_pdf(event):
+async def collect_pdf(event: events.NewMessage.Event):
     user_id = event.sender_id
     if user_id in user_files:
         if isinstance(event.document.attributes[0], DocumentAttributeFilename) and event.document.mime_type == "application/pdf":
@@ -51,9 +48,8 @@ async def collect_pdf(event):
         else:
             await event.reply("Please send only ᴘᴅғ files.")
 
-# Command to zip and send collected files
 @Jarvis.on(events.NewMessage(pattern="^/confirm$"))
-async def confirm_zip(event):
+async def confirm_zip(event: events.NewMessage.Event):
     user_id = event.sender_id
     if user_id in user_files and user_files[user_id]:
         zip_file_path = f"{user_id}_files.zip"
@@ -69,19 +65,17 @@ async def confirm_zip(event):
     else:
         await event.reply("You haven't added any files to zip. Use /zip to start.")
 
-# Function to unzip files
-def unzip_file(zip_file_path, output_folder):
+def unzip_file(zip_file_path: str, output_folder: str) -> bool:
     try:
         with zipfile.ZipFile(zip_file_path, 'r') as zip_file:
             zip_file.extractall(output_folder)
+        return True
     except Exception as e:
         LOGGER.error(f"Error unzipping file: {e}")
         return False
-    return True
 
-# Command to unzip a file
 @Jarvis.on(events.NewMessage(pattern="^/unzip$"))
-async def unzip_command(event):
+async def unzip_command(event: events.NewMessage.Event):
     if event.is_reply:
         reply_message = await event.get_reply_message()
         if reply_message and reply_message.document and reply_message.document.mime_type == "application/zip":
@@ -102,9 +96,8 @@ async def unzip_command(event):
     else:
         await event.reply("Please reply to a zip file with /unzip to extract its contents.")
 
-# Start command with instructions
 @Jarvis.on(events.NewMessage(pattern="^/start$"))
-async def start(event):
+async def start(event: events.NewMessage.Event):
     await event.reply(
         "**I ᴀᴍ ᴛʜᴇ Zɪᴘ Cᴏɴᴠᴇʀᴛᴇʀ Bᴏᴛ, ʏᴏᴜʀ ᴇғғɪᴄɪᴇɴᴛ ᴀssɪsᴛᴀɴᴛ ғᴏʀ ᴍᴀɴᴀɢɪɴɢ ᴘᴅғ ғɪʟᴇs.**\n\n"
         "**I ᴡɪʟʟ ʜᴇʟᴘ ʏᴏᴜ ᴇғғᴏʀᴛʟᴇssʟʏ ᴢɪᴘ ᴍᴜʟᴛɪᴘʟᴇ ᴘᴅғ ғɪʟᴇs ᴛᴏɢᴇᴛʜᴇʀ ᴏʀ ᴜɴᴢɪᴘ ᴛʜᴇᴍ ғᴏʀ ᴇᴀsʏ ᴀᴄᴄᴇss.**\n\n"
@@ -119,5 +112,5 @@ async def start(event):
         ]
     )
 
-# Run the client
+# Run the Telegram client
 Jarvis.run_until_disconnected()
