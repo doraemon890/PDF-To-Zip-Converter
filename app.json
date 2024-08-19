@@ -1,16 +1,20 @@
 {
-    "name": "zip file",
-    "description": "An Effective & Most SIMPLE Bot for mentioning members in telegram.",
+    "name": "Zip File",
+    "description": "A simple and effective bot for zipping and unzipping PDF files on Telegram.",
     "env": {
         "TOKEN": {
-            "description": "Enter bot token."
+            "description": "Enter your bot token here."
         },
         "APP_ID": {
-            "description": "Get this value from my.telegram.org! Please do not steal."
+            "description": "Obtain this value from my.telegram.org. Please keep it secure."
         },
         "API_HASH": {
-            "description": "Get this value from my.telegram.org! Please do not steal."
+            "description": "Obtain this value from my.telegram.org. Please keep it secure."
         }
     },
-    "buildpacks": [{"url": "heroku/python"}]
+    "buildpacks": [
+        {
+            "url": "heroku/python"
+        }
+    ]
 }
