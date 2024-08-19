@@ -47,7 +47,7 @@ async def collect_pdf(event):
         if isinstance(event.document.attributes[0], DocumentAttributeFilename) and event.document.mime_type == "application/pdf":
             file_path = await event.client.download_media(event.document)
             user_files[user_id].append(file_path)
-            await event.reply(f"Added {event.document.attributes[0].file_name} to the zip list.")
+            await event.reply(f"Added `{event.document.attributes[0].file_name}` to the zip list.")
         else:
             await event.reply("Please send only ᴘᴅғ files.")
 
