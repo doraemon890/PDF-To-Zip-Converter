@@ -5,20 +5,17 @@ import shutil
 from telethon import Button, TelegramClient, events
 from telethon.tl.types import DocumentAttributeFilename
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(name)s - [%(levelname)s] - %(message)s'
 )
 LOGGER = logging.getLogger(__name__)
 
-# Initialize the Telegram client
 api_id = int(os.getenv("APP_ID"))
 api_hash = os.getenv("API_HASH")
 bot_token = os.getenv("TOKEN")
 Jarvis = TelegramClient('client', api_id, api_hash).start(bot_token=bot_token)
 
-# Dictionary to keep track of user files
 user_files = {}
 
 def zip_files(files: list[str], zip_file_path: str) -> bool:
@@ -54,7 +51,11 @@ async def confirm_zip(event: events.NewMessage.Event):
     if user_id in user_files and user_files[user_id]:
         zip_file_path = f"{user_id}_files.zip"
         if zip_files(user_files[user_id], zip_file_path):
+            zip_file_size_mb = os.path.getsize(zip_file_path) / (1024 * 1024)
+            zip_file_size_mb = round(zip_file_size_mb, 2)
+            please_wait_message = await event.reply(f"Uploading zip ({zip_file_size_mb} MB). Please wait...")
             await event.reply(file=zip_file_path)
+            await please_wait_message.delete()
             os.remove(zip_file_path)
             for file_path in user_files[user_id]:
                 os.remove(file_path)
@@ -112,5 +113,4 @@ async def start(event: events.NewMessage.Event):
         ]
     )
 
-# Run the Telegram client
 Jarvis.run_until_disconnected()
