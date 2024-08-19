@@ -1,141 +1,123 @@
 import os
 import logging
-import asyncio
+import zipfile
+import shutil
 from telethon import Button, TelegramClient, events
-from telethon.tl.types import ChannelParticipantAdmin, ChannelParticipantCreator
-from telethon.tl.functions.channels import GetParticipantRequest
-from telethon.errors import UserNotParticipantError
+from telethon.tl.types import DocumentAttributeFilename
 
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(name)s - [%(levelname)s] - %(message)s'
 )
 LOGGER = logging.getLogger(__name__)
 
+# Initialize the Telegram client
 api_id = int(os.environ.get("APP_ID"))
 api_hash = os.environ.get("API_HASH")
 bot_token = os.environ.get("TOKEN")
-client = TelegramClient('client', api_id, api_hash).start(bot_token=bot_token)
-spam_chats = []
+Jarvis = TelegramClient('client', api_id, api_hash).start(bot_token=bot_token)
 
-@client.on(events.NewMessage(pattern="^/start$"))
+# Dictionary to keep track of user files
+user_files = {}
+
+# Function to zip files
+def zip_files(files, zip_file_path):
+    try:
+        with zipfile.ZipFile(zip_file_path, 'w') as zip_file:
+            for file in files:
+                zip_file.write(file, os.path.basename(file))
+    except Exception as e:
+        LOGGER.error(f"Error creating zip file: {e}")
+        return False
+    return True
+
+# Command to start collecting PDFs
+@Jarvis.on(events.NewMessage(pattern="^/zip$"))
+async def start_zip_command(event):
+    user_id = event.sender_id
+    user_files[user_id] = []
+    await event.reply("Please send all PDF files one by one. When done, use /confirm to zip them.")
+
+# Collect PDF files sent by the user
+@Jarvis.on(events.NewMessage(func=lambda e: e.is_private and e.document))
+async def collect_pdf(event):
+    user_id = event.sender_id
+    if user_id in user_files:
+        if isinstance(event.document.attributes[0], DocumentAttributeFilename) and event.document.mime_type == "application/pdf":
+            file_path = await event.client.download_media(event.document)
+            user_files[user_id].append(file_path)
+            await event.reply(f"Added {event.document.attributes[0].file_name} to the zip list.")
+        else:
+            await event.reply("Please send only PDF files.")
+
+# Command to zip and send collected files
+@Jarvis.on(events.NewMessage(pattern="^/confirm$"))
+async def confirm_zip(event):
+    user_id = event.sender_id
+    if user_id in user_files and user_files[user_id]:
+        zip_file_path = f"{user_id}_files.zip"
+        if zip_files(user_files[user_id], zip_file_path):
+            await event.reply(file=zip_file_path)
+            os.remove(zip_file_path)
+            for file_path in user_files[user_id]:
+                os.remove(file_path)
+            del user_files[user_id]
+            await event.reply("Your files have been zipped and sent!")
+        else:
+            await event.reply("There was an error creating the zip file.")
+    else:
+        await event.reply("You haven't added any files to zip. Use /zip to start.")
+
+# Function to unzip files
+def unzip_file(zip_file_path, output_folder):
+    try:
+        with zipfile.ZipFile(zip_file_path, 'r') as zip_file:
+            zip_file.extractall(output_folder)
+    except Exception as e:
+        LOGGER.error(f"Error unzipping file: {e}")
+        return False
+    return True
+
+# Command to unzip a file
+@Jarvis.on(events.NewMessage(pattern="^/unzip$"))
+async def unzip_command(event):
+    if event.is_reply:
+        reply_message = await event.get_reply_message()
+        if reply_message and reply_message.document and reply_message.document.mime_type == "application/zip":
+            zip_file_path = await event.client.download_media(reply_message)
+            output_folder = f"{zip_file_path}_unzipped"
+            os.makedirs(output_folder, exist_ok=True)
+            if unzip_file(zip_file_path, output_folder):
+                for root, _, files in os.walk(output_folder):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        await event.reply(file=file_path)
+                shutil.rmtree(output_folder)
+                os.remove(zip_file_path)
+            else:
+                await event.reply("There was an error unzipping the file.")
+        else:
+            await event.reply("Reply to a zip file with /unzip to extract its contents.")
+    else:
+        await event.reply("Please reply to a zip file with /unzip to extract its contents.")
+
+# Start command with instructions
+@Jarvis.on(events.NewMessage(pattern="^/start$"))
 async def start(event):
     await event.reply(
-        "**I am User Tagger Bot**,\n\nI will help you to mention near about all members in your group or channel..🫧",
+        "**I ᴀᴍ ᴛʜᴇ Zɪᴘ Cᴏɴᴠᴇʀᴛᴇʀ Bᴏᴛ, ʏᴏᴜʀ ᴇғғɪᴄɪᴇɴᴛ ᴀssɪsᴛᴀɴᴛ ғᴏʀ ᴍᴀɴᴀɢɪɴɢ PDF ғɪʟᴇs.**\n\n"
+        "**I ᴡɪʟʟ ʜᴇʟᴘ ʏᴏᴜ ᴇғғᴏʀᴛʟᴇssʟʏ ᴢɪᴘ ᴍᴜʟᴛɪᴘʟᴇ PDF ғɪʟᴇs ᴛᴏɢᴇᴛʜᴇʀ ᴏʀ ᴜɴᴢɪᴘ ᴛʜᴇᴍ ғᴏʀ ᴇᴀsʏ ᴀᴄᴄᴇss.**\n\n"
+        "Usᴇ ᴛʜᴇ ғᴏʟʟᴏᴡɪɴɢ ᴄᴏᴍᴍᴀɴᴅs:\n\n"
+        "`/ᴢɪᴘ` - Sᴛᴀʀᴛ ᴛʜᴇ ᴘʀᴏᴄᴇss ᴏғ ᴄᴏʟʟᴇᴄᴛɪɴɢ PDF ғɪʟᴇs ᴛᴏ ᴢɪᴘ.\n"
+        "`/ᴄᴏɴғɪʀᴍ` - Zɪᴘ ᴀʟʟ ᴄᴏʟʟᴇᴄᴛᴇᴅ PDF ғɪʟᴇs ᴀɴᴅ ʀᴇᴄᴇɪᴠᴇ ᴛʜᴇ ᴢɪᴘᴘᴇᴅ ғɪʟᴇ.\n"
+        "`/ᴜɴᴢɪᴘ` - Rᴇᴘʟʏ ᴛᴏ ᴀ ᴢɪᴘ ғɪʟᴇ ᴛᴏ ᴇxᴛʀᴀᴄᴛ ɪᴛs ᴄᴏɴᴛᴇɴᴛs.",
         link_preview=False,
-        buttons=(
-            [
-                Button.url("ᴏᴡɴᴇʀ", url="https://t.me/JARVIS_V2"),
-                Button.url("sᴜᴘᴘᴏʀᴛ ᴄʜᴀɴɴᴇʟ", url=f"https://t.me/JARVIS_V_SUPPORT")
-            ]
-        )
+        buttons=[
+            [Button.url("ᴏᴡɴᴇʀ", url="https://t.me/JARVIS_V2")],
+            [Button.url("sᴜᴘᴘᴏʀᴛ ᴄʜᴀɴɴᴇʟ", url="https://t.me/JARVIS_V_SUPPORT")]
+        ]
     )
 
-@client.on(events.NewMessage(pattern="^/help$"))
-async def help(event):
-    helptext = "**Help Menu of User Tagger Bot**\n\nCommand: /utag\nYou can use this command with text or reply to text that you want to say to others.\n\n/atag\nYou can use this command with text or reply to text to tag all admins on group."
-    await event.reply(
-        helptext,
-        link_preview=False,
-        buttons=(
-            [
-                Button.url("ᴏᴡɴᴇʀ", url="https://t.me/JARVIS_V2"),
-                Button.url("sᴜᴘᴘᴏʀᴛ ᴄʜᴀɴɴᴇʟ", url=f"https://t.me/JARVIS_V_SUPPORT")
-            ]
-        )
-    )
-
-async def mention_users(event, mode, msg):
-    chat_id = event.chat_id
-    if event.is_private:
-        return await event.respond("__This command can be used in groups and channels!__")
-
-    if event.pattern_match.group(1) and event.is_reply:
-        return await event.respond("__Give me one argument!__")
-    elif event.pattern_match.group(1):
-        mode = "text_on_cmd"
-        msg = event.pattern_match.group(1)
-    elif event.is_reply:
-        mode = "text_on_reply"
-        msg = await event.get_reply_message()
-        if msg == None:
-            return await event.respond("__I can't mention members for older messages! (messages which are sent before I'm added to this group)__")
-    else:
-        return await event.respond("__Reply to a message or give me some text to mention others!__")
-
-    spam_chats.append(chat_id)
-    usrnum = 0
-    usrtxt = ''
-    async for usr in client.iter_participants(chat_id):
-        if not chat_id in spam_chats:
-            break
-        usrnum += 1
-        usrtxt += f"[{usr.first_name}](tg://user?id={usr.id}) "
-        if usrnum == 5:
-            if mode == "text_on_cmd":
-                txt = f"{usrtxt}\n\n{msg}"
-                await client.send_message(chat_id, txt, link_preview=False, parse_mode='markdown')
-            elif mode == "text_on_reply":
-                await msg.reply(usrtxt, link_preview=False, parse_mode='markdown')
-            await asyncio.sleep(2)
-            usrnum = 0
-            usrtxt = ''
-    try:
-        spam_chats.remove(chat_id)
-    except:
-        pass
-
-@client.on(events.NewMessage(pattern="^/utag ?(.*)"))
-async def utag(event):
-    await mention_users(event, "text_on_cmd", event.pattern_match.group(1))
-
-@client.on(events.NewMessage(pattern="^/atag ?(.*)"))
-async def atag(event):
-    chat_id = event.chat_id
-    if event.is_private:
-        return await event.respond("__This command can be used in groups and channels!__")
-
-    try:
-        participants = await client.get_participants(chat_id)
-    except:
-        return await event.respond("__Failed to fetch participants!__")
-
-    admin_mentions = []
-    for participant in participants:
-        if (
-            isinstance(participant.participant,
-            (
-                ChannelParticipantAdmin,
-                ChannelParticipantCreator
-            ))
-        ):
-            admin_mentions.append(f"[{participant.first_name}](tg://user?id={participant.id})")
-
-    if admin_mentions:
-        admin_mentions_text = ", ".join(admin_mentions)
-        if event.pattern_match.group(1):
-            msg = event.pattern_match.group(1)
-            await client.send_message(chat_id, f"{admin_mentions_text}\n\n {msg}", link_preview=False, parse_mode='markdown')
-        elif event.is_reply:
-            msg = await event.get_reply_message()
-            if msg == None:
-                return await event.respond("__I can't mention members for older messages! (messages which are sent before I'm added to this group)__")
-            await msg.reply(admin_mentions_text, link_preview=False, parse_mode='markdown')
-        else:
-            await client.send_message(chat_id, admin_mentions_text, link_preview=False, parse_mode='markdown')
-    else:
-        await event.respond("__No admins found in this group or channel!__")
-
-@client.on(events.NewMessage(pattern="^/cancel$"))
-async def cancel_spam(event):
-    if not event.chat_id in spam_chats:
-        return await event.respond('__There is no process ongoing...__')
-    else:
-        try:
-            spam_chats.remove(event.chat_id)
-        except:
-            pass
-        return await event.respond('__Stopped.__')
-
-print(">> Jarvis User TAgger Robot Started <<")
-client.run_until_disconnected()
+# Run the client
+Jarvis.run_until_disconnected()
