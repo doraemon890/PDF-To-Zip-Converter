@@ -37,7 +37,7 @@ def zip_files(files, zip_file_path):
 async def start_zip_command(event):
     user_id = event.sender_id
     user_files[user_id] = []
-    await event.reply("Please send all PDF files one by one. When done, use /confirm to zip them.")
+    await event.reply("Please send all ᴘᴅғ files one by one. When done, use /confirm to zip them.")
 
 # Collect PDF files sent by the user
 @Jarvis.on(events.NewMessage(func=lambda e: e.is_private and e.document))
@@ -49,7 +49,7 @@ async def collect_pdf(event):
             user_files[user_id].append(file_path)
             await event.reply(f"Added {event.document.attributes[0].file_name} to the zip list.")
         else:
-            await event.reply("Please send only PDF files.")
+            await event.reply("Please send only ᴘᴅғ files.")
 
 # Command to zip and send collected files
 @Jarvis.on(events.NewMessage(pattern="^/confirm$"))
